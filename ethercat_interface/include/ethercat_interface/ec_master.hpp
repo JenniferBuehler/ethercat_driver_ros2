@@ -89,6 +89,20 @@ public:
 // Forward declarations
 class EcSlave;
 
+/** Per-slave AL state / link presence, as last observed by checkSlaveStates() (throttled to
+ *  every check_state_frequency_ cycles). One entry per addSlave() call, in add order. */
+struct EcSlaveStateInfo
+{
+  uint16_t alias = 0;
+  uint16_t position = 0;
+  /** ec_al_state_t bitmask: EC_AL_STATE_INIT=1, PREOP=2, SAFEOP=4, OP=8. */
+  uint8_t al_state = 0;
+  /** false if the slave has stopped responding on the wire (e.g. cabling/power loss). */
+  bool online = false;
+  /** true once the slave has reached OP and started exchanging valid process data. */
+  bool operational = false;
+};
+
 /** Data for a single domain */
 struct DomainInfo
 {
@@ -220,6 +234,26 @@ public:
   /** @brief Proceed to the transfer of all the data declared in transfers_.
    */
   void transferAll();
+
+  /** @brief Last-observed master state (link up/down, responding-slave count, the aggregate
+   *  AL-states bitmask across all slaves), as last updated by checkMasterState() — throttled to
+   *  every check_state_frequency_ cycles, called from update()/readData(). No new ecrt call:
+   *  this returns the cached result of that periodic check. */
+  const ec_master_state_t & masterState() const {return master_state_;}
+
+  /** @brief Last-observed domain state (working counter / completeness: ZERO, INCOMPLETE or
+   *  COMPLETE), as last updated by checkDomainState() — called every cycle from
+   *  update()/readData(). No new ecrt call: this returns the cached result.
+   *  \throw std::out_of_range if `domain` was never registered (see addSlave()/activate()). */
+  const ec_domain_state_t & domainState(uint32_t domain = 0) const
+  {
+    return domain_info_.at(domain)->domain_state;
+  }
+
+  /** @brief Last-observed per-slave AL state / online / operational, as last updated by
+   *  checkSlaveStates() — throttled to every check_state_frequency_ cycles, called from
+   *  update()/readData(). No new ecrt call: this returns the cached result. */
+  std::vector<EcSlaveStateInfo> slaveStates() const;
 
 protected:
   /** @brief Output the memory content of the all the domains

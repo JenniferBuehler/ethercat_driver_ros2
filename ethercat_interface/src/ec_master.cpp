@@ -614,6 +614,22 @@ void EcMaster::checkSlaveStates()
   }
 }
 
+std::vector<EcSlaveStateInfo> EcMaster::slaveStates() const
+{
+  std::vector<EcSlaveStateInfo> out;
+  out.reserve(slave_info_.size());
+  for (const SlaveInfo & s : slave_info_) {
+    EcSlaveStateInfo info;
+    info.alias = s.slave->alias_;
+    info.position = s.slave->position_;
+    info.al_state = s.config_state.al_state;
+    info.online = s.config_state.online;
+    info.operational = s.config_state.operational;
+    out.push_back(info);
+  }
+  return out;
+}
+
 void EcMaster::checkDomainInfoValidity(
   const DomainInfo & domain_info,
   const ec_pdo_entry_reg_t & pdo_entry_reg)

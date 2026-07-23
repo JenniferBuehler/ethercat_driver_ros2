@@ -93,6 +93,22 @@ public:
     uint16_t slave_position, uint16_t index, uint8_t sub_index,
     uint8_t * target, size_t target_size, size_t * result_size, uint32_t * abort_code);
 
+  /** @brief Bus-wide master state (link up/down, responding-slave count, aggregate AL
+   *  states), as last observed by EcMaster's periodic check during read(). No new ecrt call
+   *  — a zero-initialized struct if the master was never obtained.
+   *  Not internally locked: intended to be called from the same thread immediately after
+   *  read(), matching how read()/write() are used from the single ros2_control RT cycle. */
+  ec_master_state_t masterState() const;
+
+  /** @brief Domain (cyclic PDO exchange) state — working counter and completeness — as last
+   *  observed by EcMaster during read(). No new ecrt call. Same threading note as
+   *  masterState(). */
+  ec_domain_state_t domainState(uint32_t domain = 0) const;
+
+  /** @brief Per-slave AL state / online / operational, as last observed by EcMaster's
+   *  periodic check during read(). No new ecrt call. Same threading note as masterState(). */
+  std::vector<ethercat_interface::EcSlaveStateInfo> slaveStates() const;
+
   /** @brief Get transfer module parameters from YAML file
    * @param[in] config YAML node containing the transfer configuration root
    * @return Vector of maps containing transfer module parameters, each map corresponds to a module

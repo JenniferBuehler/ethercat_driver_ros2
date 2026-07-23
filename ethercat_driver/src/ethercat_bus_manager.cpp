@@ -463,6 +463,24 @@ EthercatCycleResult EthercatBusManager::write()
   return EthercatCycleResult::kSkippedInactive;
 }
 
+ec_master_state_t EthercatBusManager::masterState() const
+{
+  if (!master_) {return {};}
+  return master_->masterState();
+}
+
+ec_domain_state_t EthercatBusManager::domainState(uint32_t domain) const
+{
+  if (!master_) {return {};}
+  return master_->domainState(domain);
+}
+
+std::vector<ethercat_interface::EcSlaveStateInfo> EthercatBusManager::slaveStates() const
+{
+  if (!master_) {return {};}
+  return master_->slaveStates();
+}
+
 int EthercatBusManager::readSlaveSdo(
   uint16_t slave_position, uint16_t index, uint8_t sub_index,
   uint8_t * target, size_t target_size, size_t * result_size, uint32_t * abort_code)
