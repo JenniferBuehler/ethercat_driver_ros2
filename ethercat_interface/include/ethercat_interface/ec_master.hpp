@@ -89,6 +89,20 @@ public:
 // Forward declarations
 class EcSlave;
 
+/** Per-slave AL state / link presence, as last observed by checkSlaveStates() (throttled to
+ *  every check_state_frequency_ cycles). One entry per addSlave() call, in add order. */
+struct EcSlaveStateInfo
+{
+  uint16_t alias = 0;
+  uint16_t position = 0;
+  /** ec_al_state_t bitmask: EC_AL_STATE_INIT=1, PREOP=2, SAFEOP=4, OP=8. */
+  uint8_t al_state = 0;
+  /** false if the slave has stopped responding on the wire (e.g. cabling/power loss). */
+  bool online = false;
+  /** true once the slave has reached OP and started exchanging valid process data. */
+  bool operational = false;
+};
+
 /** Data for a single domain */
 struct DomainInfo
 {
@@ -123,22 +137,39 @@ public:
   explicit EcMaster(const unsigned int master = 0);
   virtual ~EcMaster();
 
+  /** \brief whether the underlying EtherCAT master was successfully obtained.
+    * Callers MUST check this before using the master; using an
+    * EcMaster whose master was not obtained would dereference a null handle.
+    */
+  bool isValid() const {return master_ != NULL;}
+
   /** \brief add a slave device to the master
     * alias and position can be found by running the following command
     * /opt/etherlab/bin$ sudo ./ethercat slaves
     * look for the "A B:C STATUS DEVICE" (e.g. B=alias, C=position)
+    * \return true on success, false if the slave could not be configured
+    *         (e.g. no matching drive on the bus, identity mismatch, PDO setup failure).
     */
-  void addSlave(uint16_t alias, uint16_t position, EcSlave * slave);
+  bool addSlave(uint16_t alias, uint16_t position, EcSlave * slave);
 
   /** \brief add a slave device to the master
     * alias and position should have been set
     * before calling this function.
+    * \return true on success, false if the slave could not be configured
+    *         (e.g. no matching drive on the bus, identity mismatch, PDO setup failure).
     */
-  void addSlave(EcSlave * slave);
+  bool addSlave(EcSlave * slave);
 
   /** \brief configure slave using SDO
     */
   int configSlaveSdo(uint16_t slave_position, SdoConfigEntry sdo_config, uint32_t * abort_code);
+
+  /** \brief read a slave SDO entry (CoE upload). Usable before or after activate.
+    * \return 0 on success (see ecrt_master_sdo_upload).
+    */
+  int uploadSlaveSdo(
+    uint16_t slave_position, uint16_t index, uint8_t sub_index,
+    uint8_t * target, size_t target_size, size_t * result_size, uint32_t * abort_code);
 
   /** call after adding all slaves, and before update */
   bool activate();
@@ -204,6 +235,26 @@ public:
    */
   void transferAll();
 
+  /** @brief Last-observed master state (link up/down, responding-slave count, the aggregate
+   *  AL-states bitmask across all slaves), as last updated by checkMasterState() — throttled to
+   *  every check_state_frequency_ cycles, called from update()/readData(). No new ecrt call:
+   *  this returns the cached result of that periodic check. */
+  const ec_master_state_t & masterState() const {return master_state_;}
+
+  /** @brief Last-observed domain state (working counter / completeness: ZERO, INCOMPLETE or
+   *  COMPLETE), as last updated by checkDomainState() — called every cycle from
+   *  update()/readData(). No new ecrt call: this returns the cached result.
+   *  \throw std::out_of_range if `domain` was never registered (see addSlave()/activate()). */
+  const ec_domain_state_t & domainState(uint32_t domain = 0) const
+  {
+    return domain_info_.at(domain)->domain_state;
+  }
+
+  /** @brief Last-observed per-slave AL state / online / operational, as last updated by
+   *  checkSlaveStates() — throttled to every check_state_frequency_ cycles, called from
+   *  update()/readData(). No new ecrt call: this returns the cached result. */
+  std::vector<EcSlaveStateInfo> slaveStates() const;
+
 protected:
   /** @brief Output the memory content of the all the domains
    * (available for pedagogic and debug purposes)
@@ -259,6 +310,13 @@ protected:
   static void printWarning(const std::string & message)
   {
     RCLCPP_WARN(rclcpp::get_logger("EthercatDriver"), "WARNING. Master. %s", message.c_str());
+  }
+
+  /** print error message to terminal */
+  inline
+  static void printError(const std::string & message)
+  {
+    RCLCPP_ERROR(rclcpp::get_logger("EthercatDriver"), "ERROR. Master. %s", message.c_str());
   }
 
 
