@@ -20,7 +20,10 @@
 #define EC_IOR(nr, type)  _IOR(EC_IOCTL_TYPE, nr, type)
 #define EC_IOW(nr, type)  _IOW(EC_IOCTL_TYPE, nr, type)
 #define EC_IOWR(nr, type)  _IOWR(EC_IOCTL_TYPE, nr, type)
-#define EC_IOCTL_VERSION_MAGIC 31
+// Must match the running master's ioctl interface version (it refuses other values).
+// 37 = IgH EtherCAT master 1.6.10; the structs and command numbers below are unchanged
+// since version 31, so only this constant tracks the master version.
+#define EC_IOCTL_VERSION_MAGIC 37
 #define EC_IOCTL_MODULE  EC_IOR(0x00, ec_ioctl_module_t)
 #define EC_IOCTL_SLAVE_SDO_UPLOAD  EC_IOWR(0x0e, ec_ioctl_slave_sdo_upload_t)
 #define EC_IOCTL_SLAVE_SDO_DOWNLOAD  EC_IOWR(0x0f, ec_ioctl_slave_sdo_download_t)

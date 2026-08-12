@@ -54,7 +54,9 @@ void upload(
 
   EcMasterAsync master(request->master_id);
   try {
-    master.open(EcMasterAsync::Read);
+    // ReadWrite: since IgH 1.6 the SDO upload ioctl requires a writable fd
+    // (it triggers a mailbox transaction) and returns EPERM otherwise.
+    master.open(EcMasterAsync::ReadWrite);
   } catch (MasterException & e) {
     return_stream << e.what();
     response->success = false;
